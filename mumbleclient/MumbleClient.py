@@ -36,23 +36,32 @@ class MumbleSettings(object):
     You can pass in implementation-specific settings in this object.  They will be ignored by the base client.
     """
 
-    host="localhost"
-    port=64738
-    nickname="MumblePythonBot"
-    SSLOptions=CertificateOptions()
-    password=None
+    def __init__(self):
+        """
+            Sets defaults for all required options.  These can be altered as required, and implementation-specific
+            settings added
+        """
+        self.host="localhost"
+        self.port=64738
+        self.nickname="MumblePythonBot"
+        self.SSLOptions=CertificateOptions()
+        self.password=None
 
 
 class User(object):
-    """ Stores all information known about a user at this time"""
+    """Stores all information known about a user at this time"""
     pass
 
 
 class _MumbleState(object):
-    numTCPPings=0
-    avgTCPPing=0
-    users=collections.defaultdict(User)
 
+    def __init__(self):
+        self.numTCPPings=0
+        self.avgTCPPing=0
+        self.users=collections.defaultdict(User)
+
+class Foo(object):
+    pass
 
 class MumbleClient(object):
     """
@@ -69,9 +78,9 @@ class MumbleClient(object):
             and alter what you wish
         - The server should then send channel and user information
         - The server will then send a ServerSync message. This triggers the .clientConnected callback,
-          and the ServerSyncReceived() method is called.
+          and the ServerSyncReceived() method is called.  At this time the sessionID variable is set
         - Every 5 seconds, the pingMessage() method is called, and the message returned sent to the server
-        - When the client disconnects, the .clientDisconnected Deferred is triggered (probably via 
+        - When the client disconnects, the .clientDisconnected Deferred is triggered (probably via
             errback and not callback) and the connectionLost() method called.
 
     In general, the client is informed of activity via method calls. Outside the object, the program is
@@ -84,17 +93,20 @@ class MumbleClient(object):
         the UDPTunnel message, which is one of two possible ways voice data can be received.  In these cases
         the VoiceMessageRecieved() function is called whether the voice source was UDP or TCP.
 
+    To tell if a message affects you, compare the message's session (target) or, optionally, actor (source)
+        to self.sessionID.  Note that you cannot react to events (cannot send arbitrary messages) until
+        ServerSyncReceived() has been called, which sets sessionID.
+
     (Note that UDP is not currently supported)
 
     """
-    sessionID=None
 
     def __init__(self,settings=None):
 
+        self.sessionID=None
         if settings is None: settings = MumbleSettings()
         self.settings=settings
         self.state=_MumbleState()
-
         self.point=SSL4ClientEndpoint(reactor, self.settings.host, self.settings.port,self.settings.SSLOptions)
         self.controlConnected = self.point.connect(_ControlFactory(self))
         self.clientConnected = defer.Deferred()
@@ -103,14 +115,14 @@ class MumbleClient(object):
     def _controlMessageReceived(self,type,name,messageObject):
         try:
             f = getattr(self,"_"+name+"Received")
-            if callable(f): f(messageObject)
         except AttributeError:
-            pass
+            f=None
+        if callable(f): f(messageObject)
         try:
             f = getattr(self,name+"Received")
-            if callable(f): f(messageObject)
         except AttributeError:
-            pass
+            f = None
+        if callable(f): f(messageObject)
 
     def _PingReceived(self,message):
         now = int(time.time()*1000000)
@@ -220,7 +232,8 @@ class AutoChannelJoinClient(MumbleClient):
             self.channelID = message.channel_id
 
     def _ServerSyncReceived(self,message):
-        MumbleClient._ServerSyncReceived(self,message)
+        super(AutoChannelJoinClient,self)._ServerSyncReceived(message)
+        #MumbleClient._ServerSyncReceived(self,message)
         newMessage = MumbleControlProtocol.UserState()
         newMessage.session = self.sessionID
         newMessage.channel_id=self.channelID

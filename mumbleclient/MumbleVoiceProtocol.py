@@ -1,6 +1,14 @@
 import sys
 
 def decodePDSInt(m,si=0):
+    """
+    Decodes a PDS int
+    Takes a sequence of bytes and optionally a starting position and decodes
+    it as if it contains a PDS integer. The return values are the integer,
+    and the number of bytes the integer was stored in, as PDS ints can be of
+    variable length.  The original starting position plus the length will be
+    the start of the next piece of data in the byte sequence
+    """
     v = ord(m[si])
     if ((v & 0x80) == 0x00):
         return ((v & 0x7F),1)
@@ -31,4 +39,26 @@ def decodeAudioMessage(message):
     prefix=message[0]
     session,sessLen=decodePDSInt(message,1)
     data=message[1+sessLen:]
+    getAudioFrames(data)
     return prefix,session,data
+
+# Speex/celt only, not OPUS. WIP
+def getAudioFrames(data):
+    audioFrames=[]
+    sequence,length = decodePDSInt(data,0)
+    position = length
+    lastPacket=False
+    print sequence,len(data),position
+    while position < len(data) and not lastPacket:
+        frameLen = ord(data[position])
+        print frameLen,
+        if frameLen>127:
+            frameLen=frameLen-127
+        else:
+            lastPacket=True
+        print lastPacket,
+        frame = data[position + 1:position+frameLen+1]
+        audioFrames.append(frame)
+        position = position + 1 + frameLen
+    position=None   #Don't decode that yet, makes my brain hurt
+    return sequence,audioFrames,position

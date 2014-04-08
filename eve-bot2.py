@@ -40,7 +40,6 @@ import time
 import sys
 
 from twisted.internet import reactor, task
-from twisted.internet import task
 
 class MimicClient(MumbleClient.AutoChannelJoinClient):
 
@@ -159,9 +158,9 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
 
 if __name__ == "__main__":
     s = MumbleClient.MumbleSettings()
-    s._autojoin_joinChannel = "TF2 Match #1"
-    s._mimic_mimicChannel = "TF2 Match Spec #1"
-    s._mimic_delayTime = 90
+    s._autojoin_joinChannel = "Diablo 3"
+    s._mimic_mimicChannel = "GW2"
+    s._mimic_delayTime = 2
     s.nickname = "Eve-next-gen"
     a = ListeningClient(s)
     reactor.run()
