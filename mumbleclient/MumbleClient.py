@@ -30,8 +30,9 @@ class MumbleSettings(object):
         .nickname   defaults to "MumblePythonBot"
         .password   defaults to "None"
         .SSLOptions By default a new instance of twisted.internet.ssl.CertificateOptions
+
     You can assign to a custom instance to provide a client certificate
-                    and/or verify the server certificate. See the twisted documentation for details
+    and/or verify the server certificate. See the twisted documentation for details
 
     You can pass in implementation-specific settings in this object.  They will be ignored by the base client.
     """
@@ -66,36 +67,41 @@ class Foo(object):
 class MumbleClient(object):
     """
     An object representing a mumble client which uses twisted as an event and network handler.
-        This should be inherited and methods overridden or implemented to create specific clients.
+    This should be inherited and methods overridden or implemented to create specific clients.
 
     Client life-cycle:
-        - Client will connect to TCP control protocol on the specified host and port
-            .controlConnected is a twisted Deferred that will make a callback when this occurs
+
+        - Client will connect to TCP control protocol on the specified host and port.
+          .controlConnected is a twisted Deferred that will make a callback when this occurs
         - After a sucessfull connection, client will try to send three control messages
-            versionMessage(), authenticationMessage() and codecVersionMessage() are called in order
-            and the results sent.  To alter the contents of these messages (assuming no setting exists),
-            it is probably easiest to override the function, call the parent to get the "base" message,
-            and alter what you wish
+          :meth:`versionMessage`, :meth:`authenticationMessage` and
+          :meth:`codecVersionMessage` are called in order and the results sent.
+          To alter the contents of these messages (assuming no setting exists), it
+          is probably easiest to override the function, call the parent to get the
+          "base" message, and alter what you wish
         - The server should then send channel and user information
-        - The server will then send a ServerSync message. This triggers the .clientConnected callback,
-          and the ServerSyncReceived() method is called.  At this time the sessionID variable is set
-        - Every 5 seconds, the pingMessage() method is called, and the message returned sent to the server
-        - When the client disconnects, the .clientDisconnected Deferred is triggered (probably via
-            errback and not callback) and the connectionLost() method called.
+        - The server will then send a ServerSync message. This triggers the
+          .clientConnected callback, and the :meth:`ServerSyncReceived`
+          method is called.  At this time the .sessionID variable is set
+        - Every 5 seconds, the :meth:`pingMessage`: method is called, and
+          the message returned sent to the server
+        - When the client disconnects, the .clientDisconnected Deferred is
+          triggered (probably via errback and not callback) and the
+          :meth:`connectionLost` method called.
 
     In general, the client is informed of activity via method calls. Outside the object, the program is
-        informed of (some) activity via the 3 Deferred objects, with more details functionality being the
-        responsiblility of the implementer
+    informed of (some) activity via the 3 Deferred objects, with more details functionality being the
+    responsiblility of the implementer
 
     In general, if a message Foo is received by the client, the method FooReceived(self,message) will be called.
-        See MumbleControlProtocol for a list of MessageTypes.  Some are implemented in this class and can be
-        overridden; some are not needed for base functionality but will be called if defined.  The exception is
-        the UDPTunnel message, which is one of two possible ways voice data can be received.  In these cases
-        the VoiceMessageRecieved() function is called whether the voice source was UDP or TCP.
+    See MumbleControlProtocol for a list of MessageTypes.  Some are implemented in this class and can be
+    overridden; some are not needed for base functionality but will be called if defined.  The exception is
+    the UDPTunnel message, which is one of two possible ways voice data can be received.  In these cases
+    the :meth:`VoiceMessageRecieved` function is called whether the voice source was UDP or TCP.
 
     To tell if a message affects you, compare the message's session (target) or, optionally, actor (source)
-        to self.sessionID.  Note that you cannot react to events (cannot send arbitrary messages) until
-        ServerSyncReceived() has been called, which sets sessionID.
+    to self.sessionID.  Note that you cannot react to events (cannot send arbitrary messages) until
+    just before :meth:`ServerSyncReceived` has been called, which sets sessionID.
 
     (Note that UDP is not currently supported)
 
@@ -107,7 +113,6 @@ class MumbleClient(object):
         if settings is None: settings = MumbleSettings()
         self.settings=settings
         self.state=_MumbleState()
-        self.point=SSL4ClientEndpoint(reactor, self.settings.host, self.settings.port,self.settings.SSLOptions)
         self.clientConnected = defer.Deferred()
         self.clientDisconnected = defer.Deferred()
 
@@ -116,15 +121,17 @@ class MumbleClient(object):
         Asks the client to connect the control protocol
 
         Returns a deferred which will callback when the connection suceeds.
-        This can also be accessed via the controlConnected attribute
-
+        This can also be accessed via the controlConnected attribute.
         Note that this only indicates a TCP connection, which might, if the
         client supplies incorrect authentication details, be immediately closed.
 
         The clientConnected attribute is a Deferred which will return when
         the login phase is complete.
+
+        :return: A Deferred
         """
 
+        self.point=SSL4ClientEndpoint(reactor, self.settings.host, self.settings.port,self.settings.SSLOptions)
         self.controlConnected = self.point.connect(_ControlFactory(self))
         return self.controlConnected
 
@@ -182,9 +189,21 @@ class MumbleClient(object):
     def _pingTask(self):
         self.sendMessage(self.pingMessage())
 
+    def ServerSyncReceived(self,message):
+        """
+        Called upon receipt of a ServerSync message
+
+        By the time this is called, sessionID will be set to the client's
+        session and the clientConnected callback will have completed.
+
+        :param message: A ServerSync message object
+        """
+
     def sendVoiceMessage(self,data):
         """
         Send a voice message via the active voice channel
+
+        :param str data: A stream of bytes
 
         This will send data either via the TCP control channel or the UDP
         voice channel if the latter is active.  Data should be a stream of
@@ -207,12 +226,11 @@ class MumbleClient(object):
         """
         Called when voice data is received
 
-        Parameters:
-        prefix  The one-byte message header indicating codec type and if this
-                    was a standard or direct transmission
-        session The session ID of the source of the transmission
-        data    The voice data, consisting of a series of voice frames and
-                    optionally positional audio at the end
+        :param str prefix:  The one-byte message header indicating codec type and if this
+            was a standard or direct transmission
+        :param int session: The session ID of the source of the transmission
+        :param str data:    The voice data, consisting of a series of voice frames and
+            optionally positional audio at the end
 
         If you simply wish to output the voice data again, you can call
         sendVoiceMessage and pass in prefix + data as the data.
@@ -222,9 +240,30 @@ class MumbleClient(object):
         pass
 
     def sendMessage(self,message):
+        """
+        Send a control message
+
+        If you call this method with :obj:`None`, it will ignore the call. This
+        behavior is so implementers can cancel the sending of an automatic
+        message (like Ping) by overriding :meth:`pingMessage` and returning
+        None
+
+        :param message: Any kind of TCP control message, or :obj:`None`
+
+        """
         if message is not None: self.controlProtocol.sendMessage(message)
 
     def versionMessage(self):
+        """
+        Called by the client to ask what message to send when it should send
+        a Version message on initial connect.
+
+        To change the message it's probably easiest to call the superclass
+        method and alter the appropriate fields.
+
+        :return: a Version object
+        """
+
         message = MumbleControlProtocol.Version()
         message.release="1.2.5"
         message.version=66053
@@ -233,6 +272,16 @@ class MumbleClient(object):
         return message
 
     def authenticationMessage(self):
+        """
+        Called by the client to ask what message to send when it should send
+        an Authenticate message on initial connect.
+
+        To change the message it's probably easiest to call the superclass
+        method and alter the appropriate fields.
+
+        :return: an Authenticate object
+        """
+
         message = MumbleControlProtocol.Authenticate()
         message.username=self.settings.nickname
         if self.settings.password is not None: message.password=self.settings.password
@@ -242,6 +291,16 @@ class MumbleClient(object):
         return message
 
     def codecVersionMessage(self):
+        """
+        Called by the client to ask what message to send when it should send
+        a CodecVersion message on initial connect.
+
+        To change the message it's probably easiest to call the superclass
+        method and alter the appropriate fields.
+
+        :return: a CodecVersion object
+        """
+
         message = MumbleControlProtocol.CodecVersion()
         message.alpha=-2147483637
         message.beta=0
@@ -249,6 +308,16 @@ class MumbleClient(object):
         return message
 
     def pingMessage(self):
+        """
+        Called by the client to ask what message to send when it should send
+        a Ping message every five seconds.
+
+        To change the message it's probably easiest to call the superclass
+        method and alter the appropriate fields.
+
+        :return: a Ping object
+        """
+
         message = MumbleControlProtocol.Ping()
         timestamp = int(time.time()*1000000)
         message.timestamp=timestamp
@@ -268,6 +337,12 @@ class MumbleClient(object):
         return message
 
     def disconnect(self):
+        """
+        Ask the client to disconnect the control channel
+
+        When sucessful, the .clientDisconnected Deferred is triggered (probably via errback and not callback) 
+
+        """
         self.controlProtocol.disconnect()
 
 

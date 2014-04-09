@@ -64,17 +64,20 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
     mimics={}
 
     def UserStateReceived(self,message):
-        if self.sessionID is not None:  self.checkSession(message.session)
+        if self.sessionID is not None:
+            self.checkSession(message.session)
 
     def checkSession(self,session):
+        user=self.state.users[session]
+        if not hasattr(user,"channel_id"): return
         #If the person isn't us or one of our bots,
         if session != self.sessionID and session not in self.mimics:
             #Then, if they're a tracked person
             if session in self.users:
                 #Set disconnect True if they aren't in the right channel, and vice versa
-                self.users[session].settings._mimic_wantDisconnect=(self.state.users[session].channel_id != self.channelID)
+                self.users[session].settings._mimic_wantDisconnect=(user.channel_id != self.channelID)
             #If they aren't tracked, and should be, add a mimic
-            elif self.state.users[session].channel_id == self.channelID:
+            elif user.channel_id == self.channelID:
                 self.addMimic(session)
 
 
@@ -129,7 +132,7 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
         return result
 
     def ServerSyncReceived(self,message):
-        v = task.deferLater(reactor,1,self.sendVoiceData)
+        v = task.deferLater(reactor,0.1,self.sendVoiceData)
         for user in self.state.users:
             self.checkSession(user)
 
@@ -143,7 +146,7 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
         while True:
             sent=False
             t= time.time()
-            nt = t+1
+            nt = t+0.005
             for a,mimic in self.mimics.iteritems():
                 vd = mimic.settings.voiceData
                 if len(vd) > 0:
@@ -161,9 +164,9 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
 
 if __name__ == "__main__":
     s = MumbleClient.MumbleSettings()
-    s._autojoin_joinChannel = "Diablo 3"
+    s._autojoin_joinChannel = "General Chat"
     s._mimic_mimicChannel = "GW2"
-    s._mimic_delayTime = 2
+    s._mimic_delayTime = 0.001
     s.nickname = "Eve-next-gen"
     a = ListeningClient(s)
     a.connect()

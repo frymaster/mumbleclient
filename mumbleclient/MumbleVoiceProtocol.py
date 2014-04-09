@@ -48,15 +48,15 @@ def getAudioFrames(data):
     sequence,length = decodePDSInt(data,0)
     position = length
     lastPacket=False
-    print sequence,len(data),position
+    #print sequence,len(data),position
     while position < len(data) and not lastPacket:
         frameLen = ord(data[position])
-        print frameLen,
+        #print frameLen,
         if frameLen>127:
             frameLen=frameLen-127
         else:
             lastPacket=True
-        print lastPacket,
+        #print lastPacket,
         frame = data[position + 1:position+frameLen+1]
         audioFrames.append(frame)
         position = position + 1 + frameLen
