@@ -108,9 +108,25 @@ class MumbleClient(object):
         self.settings=settings
         self.state=_MumbleState()
         self.point=SSL4ClientEndpoint(reactor, self.settings.host, self.settings.port,self.settings.SSLOptions)
-        self.controlConnected = self.point.connect(_ControlFactory(self))
         self.clientConnected = defer.Deferred()
         self.clientDisconnected = defer.Deferred()
+
+    def connect(self):
+        """
+        Asks the client to connect the control protocol
+
+        Returns a deferred which will callback when the connection suceeds.
+        This can also be accessed via the controlConnected attribute
+
+        Note that this only indicates a TCP connection, which might, if the
+        client supplies incorrect authentication details, be immediately closed.
+
+        The clientConnected attribute is a Deferred which will return when
+        the login phase is complete.
+        """
+
+        self.controlConnected = self.point.connect(_ControlFactory(self))
+        return self.controlConnected
 
     def _controlMessageReceived(self,type,name,messageObject):
         try:
@@ -167,12 +183,42 @@ class MumbleClient(object):
         self.sendMessage(self.pingMessage())
 
     def sendVoiceMessage(self,data):
+        """
+        Send a voice message via the active voice channel
+
+        This will send data either via the TCP control channel or the UDP
+        voice channel if the latter is active.  Data should be a stream of
+        bytes in mumble's voice format.
+        """
+
         self.controlProtocol.sendVoiceMessage(data)
 
     def connectionLost(self,reason):
+        """
+        Called when a connection is lost to the control protocol
+
+        This is called after the clientDisconnected callback is returned.
+        Implementors can override this method or listen for the callback,
+        depending on use-case
+        """
         pass
 
     def VoiceMessageReceived(self,prefix,session,data,TCP=False):
+        """
+        Called when voice data is received
+
+        Parameters:
+        prefix  The one-byte message header indicating codec type and if this
+                    was a standard or direct transmission
+        session The session ID of the source of the transmission
+        data    The voice data, consisting of a series of voice frames and
+                    optionally positional audio at the end
+
+        If you simply wish to output the voice data again, you can call
+        sendVoiceMessage and pass in prefix + data as the data.
+
+        Implementors should override this method to process voice data.
+        """
         pass
 
     def sendMessage(self,message):
@@ -242,6 +288,7 @@ class AutoChannelJoinClient(MumbleClient):
 
 if __name__ == '__main__':
     c = MumbleClient()
+#    c.connect()
     def stop(reason):
         reactor.stop()
     c.clientDisconnected.addBoth(stop)

@@ -44,6 +44,8 @@ from twisted.internet import reactor, task
 class MimicClient(MumbleClient.AutoChannelJoinClient):
 
     def ServerSyncReceived(self,message):
+        #We may have had voice data waiting to be transmitted.  Prune all
+        # voice data set to go out before the current point.
         t=time.time()
         vd = self.settings.voiceData
         while True:
@@ -120,6 +122,7 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
         self.users[session] = mimic
         mimic.clientConnected.addCallback(self.mimicConnected,mimic)
         mimic.clientDisconnected.addBoth(self.mimicDisconnected,mimicObject=mimic,userSession=session)
+        mimic.connect()
 
     def mimicConnected(self,result,mimic):
         self.mimics[mimic.sessionID]=mimic
@@ -163,4 +166,5 @@ if __name__ == "__main__":
     s._mimic_delayTime = 2
     s.nickname = "Eve-next-gen"
     a = ListeningClient(s)
+    a.connect()
     reactor.run()
