@@ -25,11 +25,12 @@ class MumbleSettings(object):
     Object to hold settings passed to a MumbleClient.
 
     Settings used by the base client are:
-        defaults to "localhost".  At this time MumbleClient is ipv4 only
-        .port       defaults to 64738
-        .nickname   defaults to "MumblePythonBot"
-        .password   defaults to "None"
-        .SSLOptions By default a new instance of twisted.internet.ssl.CertificateOptions
+
+    .hostname defaults to "localhost".  At this time MumbleClient is ipv4 only
+    .port defaults to 64738
+    .nickname   defaults to "MumblePythonBot"
+    .password   defaults to "None"
+    .SSLOptions By default a new instance of twisted.internet.ssl.CertificateOptions
 
     You can assign to a custom instance to provide a client certificate
     and/or verify the server certificate. See the twisted documentation for details
@@ -39,10 +40,16 @@ class MumbleSettings(object):
 
     def __init__(self):
         """
-            Sets defaults for all required options.  These can be altered as required, and implementation-specific
-            settings added
+        Sets defaults for all required options.  These can be altered as required, and implementation-specific
+        settings added
         """
+
         self.host="localhost"
+        """
+        :annotation = "localhost":
+        defaults to "localhost".  At this time MumbleClient is ipv4 only
+        """
+
         self.port=64738
         self.nickname="MumblePythonBot"
         self.SSLOptions=CertificateOptions()
