@@ -58,6 +58,7 @@ class MimicClient(MumbleClient.AutoChannelJoinClient):
                 pass
             if not someFound: break
 
+
 class ListeningClient(MumbleClient.AutoChannelJoinClient):
 
     users={}
@@ -84,7 +85,6 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
     def disconnectMimic(self,session):
         mimic = self.users[session]
         del self.users[session]
-        del self.mimics[mimic.sessionID]
         mimic.disconnect()
 
     def checkMimics(self):
@@ -133,6 +133,7 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
 
     def ServerSyncReceived(self,message):
         v = task.deferLater(reactor,0.1,self.sendVoiceData)
+        v.addErrback(self.errorCallback)
         for user in self.state.users:
             self.checkSession(user)
 
@@ -158,14 +159,15 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
                         if vd[0][0] < nt: nt = vd[0][0]
             if not sent: break
         v = task.deferLater(reactor,nt-t,self.sendVoiceData)
+        v.addErrback(self.errorCallback)
 
     def connectionLost(self,reason):
         if reactor.running: reactor.stop()
 
 if __name__ == "__main__":
     s = MumbleClient.MumbleSettings()
-    s._autojoin_joinChannel = "General Chat"
-    s._mimic_mimicChannel = "GW2"
+    s._autojoin_joinChannel = "GW2"
+    s._mimic_mimicChannel = "General Chat"
     s._mimic_delayTime = 0.001
     s.nickname = "Eve-next-gen"
     a = ListeningClient(s)

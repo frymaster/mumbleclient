@@ -187,7 +187,8 @@ class MumbleClient(object):
         self.sendMessage(self.authenticationMessage())
         self.sendMessage(self.codecVersionMessage())
         self.state.pingTask = task.LoopingCall(self._pingTask)
-        self.state.pingTask.start(5.0,now=False)
+        self.state.pingTaskDeferred = self.state.pingTask.start(5.0,now=False)
+        self.state.pingTaskDeferred.addErrback(self.errorCallback)
 
     def _connectionLost(self,reason):
         self.clientDisconnected.callback(reason)
@@ -351,6 +352,10 @@ class MumbleClient(object):
 
         """
         self.controlProtocol.disconnect()
+
+    def errorCallback(self,result):
+        print result
+        return result
 
 
 class AutoChannelJoinClient(MumbleClient):
