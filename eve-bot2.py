@@ -38,6 +38,7 @@ from mumbleclient import MumbleControlProtocol
 import heapq
 import time
 import sys
+import optparse
 
 from twisted.internet import reactor, task
 
@@ -118,14 +119,34 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
             s.voiceData = []
         else:
             s = settings
+        orig = self.settings
+        s.hostname = orig.hostname
+        s.port = orig.port
+        s.password = orig.password
         s._autojoin_joinChannel = self.settings._mimic_mimicChannel
-        s.nickname = "next-gen-" + self.state.users[session].name
+        s.nickname = self.getUnusedName(self.settings._mimic_mimicName.replace("{name}",self.state.users[session].name))
         s._mimic_wantDisconnect=False
         mimic = MimicClient(s)
         self.users[session] = mimic
         mimic.clientConnected.addCallback(self.mimicConnected,mimic)
         mimic.clientDisconnected.addBoth(self.mimicDisconnected,mimicObject=mimic,userSession=session)
         mimic.connect()
+
+    def getUnusedName(self,proposedName):
+        userNames = set()
+        for u in self.state.users:
+            user = self.state.users[u]
+            try:
+                name = user.name
+            except AttributeError:
+                name = None
+            userNames.add(name)
+        if proposedName not in userNames: return proposedName
+        i=0
+        while True:
+            tryName = proposedName + str(i)
+            if tryName not in userNames: return tryName
+            i+i+1
 
     def mimicConnected(self,result,mimic):
         self.mimics[mimic.sessionID]=mimic
@@ -140,14 +161,15 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
     def VoiceMessageReceived(self,prefix,session,data,TCP=False):
         if session in self.users:
             mimic = self.users[session]
-            heapq.heappush(mimic.settings.voiceData,(time.time()+self.settings._mimic_delayTime,prefix+data))
+            if not mimic.settings._mimic_wantDisconnect:
+                heapq.heappush(mimic.settings.voiceData,(time.time()+self.settings._mimic_delayTime,prefix+data))
 
     def sendVoiceData(self):
         self.checkMimics()
         while True:
             sent=False
             t= time.time()
-            nt = t+0.005
+            nt = t+self.settings._mimic_delayTime
             for a,mimic in self.mimics.iteritems():
                 vd = mimic.settings.voiceData
                 if len(vd) > 0:
@@ -164,12 +186,49 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
     def connectionLost(self,reason):
         if reactor.running: reactor.stop()
 
-if __name__ == "__main__":
+def main():
+    p = optparse.OptionParser(description='Mumble 1.2 relaybot to relay comms from a match channel to a spectator channel, with a time delay e.g. if watching on a delayed SourceTV server. Full documentation is available at http://frymaster.127001.org/mumble',
+                prog='eve-bot2.py',
+                version='%prog 2.0',
+                usage='\t%prog -e \"Match Channel\" -r \"Spectator Channel\"')
+
+    p.add_option("-e","--eavesdrop-in",help="Channel to eavesdrop in (MANDATORY)",action="store",type="string")
+    p.add_option("-r","--relay-to",help="Channel to relay speech to (MANDATORY)",action="store",type="string")
+    p.add_option("-s","--server",help="Host to connect to (default %default)",action="store",type="string",default="localhost")
+    p.add_option("-p","--port",help="Port to connect to (default %default)",action="store",type="int",default=64738)
+    p.add_option("-n","--nick",help="Nickname for the eavesdropper (default %default)",action="store",type="string",default="-Eve-")
+    p.add_option("-d","--delay",help="Time to delay speech by in seconds (default %default)",action="store",type="float",default=90)
+    p.add_option("-m","--mimic-name",help="Name for mimic-bots; {name} will be replaced by the player's name (default %default)",action="store",type="string",default="Mimic-{name}")
+    p.add_option("--password",help="Password for server, if any",action="store",type="string")
+
+    o, arguments = p.parse_args()
+
+    if o.relay_to==None or o.eavesdrop_in==None:
+        p.print_help()
+        print "\nYou MUST include both an eavesdrop channel to listen to, and a relay channel to relay to"
+        sys.exit(1)
+
+    if o.eavesdrop_in=="Root":
+        p.print_help()
+        print "\nEavesdrop channel cannot be root (or it would briefly attempt to mimic everyone who joined - including mimics)"
+        sys.exit(1)
+
+    if o.mimic_name.find("{name}") == -1:
+        o.mimic_name = o.mimic_name + "{name}"
+
     s = MumbleClient.MumbleSettings()
-    s._autojoin_joinChannel = "GW2"
-    s._mimic_mimicChannel = "General Chat"
-    s._mimic_delayTime = 0.001
-    s.nickname = "Eve-next-gen"
-    a = ListeningClient(s)
-    a.connect()
+    s._autojoin_joinChannel = o.eavesdrop_in
+    s._mimic_mimicChannel = o.relay_to
+    s._mimic_mimicName = o.mimic_name
+    s._mimic_delayTime = o.delay
+    s.nickname = o.nick
+    s.hostname = o.server
+    s.port = o.port
+    s.password = o.password
+    eve = ListeningClient(s)
+    eve.connect()
     reactor.run()
+
+
+if __name__ == "__main__":
+    main()
