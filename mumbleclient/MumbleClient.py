@@ -26,7 +26,7 @@ class MumbleSettings(object):
 
     Settings used by the base client are:
 
-    .hostname defaults to "localhost".  At this time MumbleClient is ipv4 only
+    .host defaults to "localhost".  At this time MumbleClient is ipv4 only
     .port defaults to 64738
     .nickname   defaults to "MumblePythonBot"
     .password   defaults to "None"

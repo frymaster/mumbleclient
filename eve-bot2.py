@@ -120,7 +120,7 @@ class ListeningClient(MumbleClient.AutoChannelJoinClient):
         else:
             s = settings
         orig = self.settings
-        s.hostname = orig.hostname
+        s.host = orig.host
         s.port = orig.port
         s.password = orig.password
         s._autojoin_joinChannel = self.settings._mimic_mimicChannel
@@ -222,7 +222,7 @@ def main():
     s._mimic_mimicName = o.mimic_name
     s._mimic_delayTime = o.delay
     s.nickname = o.nick
-    s.hostname = o.server
+    s.host = o.server
     s.port = o.port
     s.password = o.password
     eve = ListeningClient(s)
